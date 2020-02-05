@@ -15,6 +15,7 @@
 
 #include "dataStructures.h"
 #include "matching2D.hpp"
+#include "ring_buffer.hpp"
 
 using namespace std;
 
@@ -42,6 +43,7 @@ int main(int argc, const char *argv[])
 
     /* MAIN LOOP OVER ALL IMAGES */
 
+    circular_buffer<DataFrame> dataBufferRing(dataBufferSize);
     for (size_t imgIndex = 0; imgIndex <= imgEndIndex - imgStartIndex; imgIndex++)
     {
         /* LOAD IMAGE INTO BUFFER */
@@ -62,7 +64,10 @@ int main(int argc, const char *argv[])
         // push image into data frame buffer
         DataFrame frame;
         frame.cameraImg = imgGray;
-        dataBuffer.push_back(frame);
+        dataBufferRing.put(frame);
+        cout << "ring size " <<  dataBufferRing.size() << endl;
+        //dataBuffer.push_back(frame);
+        // replacing with ring buffer
 
         //// EOF STUDENT ASSIGNMENT
         cout << "#1 : LOAD IMAGE INTO BUFFER done" << endl;
@@ -115,7 +120,9 @@ int main(int argc, const char *argv[])
         }
 
         // push keypoints and descriptor for current frame to end of data buffer
-        (dataBuffer.end() - 1)->keypoints = keypoints;
+
+        frame.keypoints = keypoints;
+
         cout << "#2 : DETECT KEYPOINTS done" << endl;
 
         /* EXTRACT KEYPOINT DESCRIPTORS */
@@ -126,18 +133,22 @@ int main(int argc, const char *argv[])
 
         cv::Mat descriptors;
         string descriptorType = "BRISK"; // BRIEF, ORB, FREAK, AKAZE, SIFT
-        descKeypoints((dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->cameraImg, descriptors, descriptorType);
+        descKeypoints(frame.keypoints, frame.cameraImg,
+                      descriptors, descriptorType);
         //// EOF STUDENT ASSIGNMENT
 
         // push descriptors for current frame to end of data buffer
-        (dataBuffer.end() - 1)->descriptors = descriptors;
+        frame.descriptors = descriptors;
 
         cout << "#3 : EXTRACT DESCRIPTORS done" << endl;
-
-        if (dataBuffer.size() > 1) // wait until at least two images have been processed
+        cout << "ring size " <<  dataBufferRing.size() << endl;
+        if (dataBufferRing.size() > 1) // wait until at least two images have been processed
         {
-
             /* MATCH KEYPOINT DESCRIPTORS */
+
+            DataFrame frame1 = dataBufferRing.get();
+            DataFrame frame2 = dataBufferRing.get();
+            dataBufferRing.put(frame2);
 
             vector<cv::DMatch> matches;
             string matcherType = "MAT_BF";        // MAT_BF, MAT_FLANN
@@ -148,14 +159,14 @@ int main(int argc, const char *argv[])
             //// TASK MP.5 -> add FLANN matching in file matching2D.cpp
             //// TASK MP.6 -> add KNN match selection and perform descriptor distance ratio filtering with t=0.8 in file matching2D.cpp
 
-            matchDescriptors((dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints,
-                             (dataBuffer.end() - 2)->descriptors, (dataBuffer.end() - 1)->descriptors,
+            matchDescriptors(frame1.keypoints, frame2.keypoints,
+                             frame1.descriptors, frame2.descriptors,
                              matches, descriptorType, matcherType, selectorType);
 
             //// EOF STUDENT ASSIGNMENT
 
             // store matches in current data frame
-            (dataBuffer.end() - 1)->kptMatches = matches;
+            frame2.kptMatches = matches;
 
             cout << "#4 : MATCH KEYPOINT DESCRIPTORS done" << endl;
 
@@ -163,9 +174,10 @@ int main(int argc, const char *argv[])
             bVis = true;
             if (bVis)
             {
-                cv::Mat matchImg = ((dataBuffer.end() - 1)->cameraImg).clone();
-                cv::drawMatches((dataBuffer.end() - 2)->cameraImg, (dataBuffer.end() - 2)->keypoints,
-                                (dataBuffer.end() - 1)->cameraImg, (dataBuffer.end() - 1)->keypoints,
+
+                cv::Mat matchImg = (frame2.cameraImg).clone();
+                cv::drawMatches(frame1.cameraImg, frame1.keypoints,
+                                frame2.cameraImg, frame2.keypoints,
                                 matches, matchImg,
                                 cv::Scalar::all(-1), cv::Scalar::all(-1),
                                 vector<char>(), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
