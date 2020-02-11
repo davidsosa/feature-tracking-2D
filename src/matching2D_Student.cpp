@@ -48,15 +48,27 @@ void descKeypoints(vector<cv::KeyPoint> &keypoints, cv::Mat &img, cv::Mat &descr
 
         extractor = cv::BRISK::create(threshold, octaves, patternScale);
     }
-    else if (descriptorType == "SIFT")
+
+    // MP.4 Keypoint Descriptors
+    else if(descriptorType.compare("BRIEF") == 0)
     {
-        int nfeatures = 0; // The number of best features to retain.
-        int nOctaveLayers = 3; // The number of layers in each octave. 3 is the value used in D. Lowe paper.
-        // The contrast threshold used to filter out weak features in semi-uniform (low-contrast) regions.
-        double contrastThreshold = 0.04;
-        double edgeThreshold = 10; // The threshold used to filter out edge-like features.
-        double sigma = 1.6; // The sigma of the Gaussian applied to the input image at the octave \#0.
-        extractor = cv::xfeatures2d::SIFT::create(nfeatures, nOctaveLayers, contrastThreshold, edgeThreshold, sigma);
+        extractor = cv::xfeatures2d::BriefDescriptorExtractor::create();
+    }
+    else if(descriptorType.compare("ORB") == 0)
+    {
+        extractor = cv::ORB::create();
+    }
+    else if(descriptorType.compare("AKAZE") == 0)
+    {
+        extractor = cv::AKAZE::create();
+    }
+    else if(descriptorType.compare("FREAK") == 0)
+    {
+        extractor = cv::xfeatures2d::FREAK::create();
+    }
+    else if(descriptorType.compare("SIFT") == 0)
+    {
+        extractor = cv::xfeatures2d::SIFT::create();
     }
 
     // perform feature description
