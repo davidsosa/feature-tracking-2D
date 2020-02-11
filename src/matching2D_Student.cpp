@@ -118,3 +118,30 @@ void detKeypointsShiTomasi(vector<cv::KeyPoint> &keypoints, cv::Mat &img, bool b
         cv::waitKey(0);
     }
 }
+
+void detKeypointsHarris(std::vector<cv::KeyPoint> &keypoints, cv::Mat &img, bool bVis)
+{
+    // Detector parameters
+    // for every pixel, a blockSize × blockSize neighborhood is considered
+    int blockSize = 2;
+    // aperture parameter for Sobel operator (must be odd)
+    int apertureSize = 3;
+    // minimum value for a corner in the 8bit scaled response matrix
+    int minResponse = 100;
+    // Harris parameter (see equation for details)
+    double k = 0.04;
+
+    double t = (double)cv::getTickCount();
+
+    // Detect Harris corners
+    cv::Mat dst, dst_norm, dst_norm_scaled;
+    dst = cv::Mat::zeros(img.size(), CV_32FC1);
+    cv::cornerHarris(img, dst, blockSize, apertureSize, k, cv::BORDER_DEFAULT);
+
+    // normalize output
+    cv::normalize(dst, dst_norm, 0, 255, cv::NORM_MINMAX, CV_32FC1, cv::Mat());
+    cv::convertScaleAbs(dst_norm, dst_norm_scaled);
+
+    // Look for prominent corners and instantiate keypoints
+    double maxOverlap = 0.0; // max. permissible overlap between two features in %, used during non-maxima suppression
+}
