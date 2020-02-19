@@ -3,6 +3,7 @@
 
 using namespace std;
 
+
 // Find best matches for keypoints in two camera images based on several matching methods
 void matchDescriptors(std::vector<cv::KeyPoint> &kPtsSource, std::vector<cv::KeyPoint> &kPtsRef, cv::Mat &descSource, cv::Mat &descRef,
                       std::vector<cv::DMatch> &matches, std::string descriptorType, std::string matcherType, std::string selectorType)
@@ -11,15 +12,38 @@ void matchDescriptors(std::vector<cv::KeyPoint> &kPtsSource, std::vector<cv::Key
     bool crossCheck = false;
     cv::Ptr<cv::DescriptorMatcher> matcher;
 
+    /*
     if (matcherType.compare("MAT_BF") == 0)
     {
         int normType = cv::NORM_HAMMING;
         matcher = cv::BFMatcher::create(normType, crossCheck);
     }
+    */
+
+    // ...add start: MP.5 Descriptor Matching
+    if (matcherType.compare("MAT_BF") == 0)
+    {
+        int normType = cv::NORM_L2;
+
+        if(descriptorType.compare("DES_BINARY") == 0)
+        {
+            normType = cv::NORM_HAMMING;
+        }
+        matcher = cv::BFMatcher::create(normType, crossCheck);
+        cout << "BF matching cross-check=" << crossCheck;
+    }
     else if (matcherType.compare("MAT_FLANN") == 0)
     {
-        // ...
+        // OpenCV bug workaround : convert binary descriptors to floating point due to a bug in current OpenCV implementation
+        if (descSource.type() != CV_32F)
+        {
+            descSource.convertTo(descSource, CV_32F);
+            descRef.convertTo(descRef, CV_32F);
+        }
+
+        matcher = cv::FlannBasedMatcher::create();
     }
+    // ...add end: MP.5 Descriptor Matching
 
     // perform matching task
     if (selectorType.compare("SEL_NN") == 0)
@@ -30,7 +54,20 @@ void matchDescriptors(std::vector<cv::KeyPoint> &kPtsSource, std::vector<cv::Key
     else if (selectorType.compare("SEL_KNN") == 0)
     { // k nearest neighbors (k=2)
 
-        // ...
+        // ...add start: MP.6 Descriptor Distance Ratio
+        vector<vector<cv::DMatch>> knn_matches;
+        matcher->knnMatch(descSource, descRef, knn_matches, 2);
+
+        double minDescDistRatio = 0.8;
+        for(auto it = knn_matches.begin(); it != knn_matches.end(); ++it)
+        {
+            if( ((*it)[0].distance) < ((*it)[1].distance * minDescDistRatio) )
+            {
+                matches.push_back((*it)[0]);
+            }
+        }
+        cout << "# keypoints removed = " << knn_matches.size() - matches.size() << endl;
+        // ...add end: MP.6 Descriptor Distance Ratio
     }
 }
 
@@ -201,3 +238,55 @@ void detKeypointsHarris(std::vector<cv::KeyPoint> &keypoints, cv::Mat &img, bool
         cv::waitKey(0);
     }
 }
+
+// detectorType = FAST, BRISK, ORB, AKAZE, SIFT
+void detKeypointsModern(std::vector<cv::KeyPoint> &keypoints, cv::Mat &img, std::string detectorType, bool bVis)
+{
+    double t = (double)cv::getTickCount();
+    cv::Ptr<cv::Feature2D> detector;
+
+    if(detectorType.compare("FAST") == 0)
+    {
+        detector = cv::FastFeatureDetector::create();
+        detector->detect(img, keypoints);
+    }
+    else if(detectorType.compare("BRISK") == 0)
+    {
+        detector = cv::BRISK::create();
+        detector->detect(img, keypoints);
+    }
+    else if(detectorType.compare("ORB") == 0)
+    {
+        detector = cv::ORB::create();
+        detector->detect(img, keypoints);
+    }
+    else if(detectorType.compare("AKAZE") == 0)
+    {
+        detector = cv::AKAZE::create();
+        detector->detect(img, keypoints);
+    }
+    else if(detectorType.compare("SIFT") == 0)
+    {
+        detector = cv::xfeatures2d::SIFT::create();
+        detector->detect(img, keypoints);
+    }
+    else
+    {
+        throw invalid_argument(detectorType + " is not a valid detectorType. Try FAST, BRISK, ORB, AKAZE, SIFT.");
+    }
+
+    t = ((double)cv::getTickCount() - t) / cv::getTickFrequency();
+    cout << detectorType << " detection with n=" << keypoints.size() << " keypoints in " << 1000 * t / 1.0 << " ms" << endl;
+
+    // visualize results
+    if (bVis)
+    {
+        cv::Mat visImage = img.clone();
+        cv::drawKeypoints(img, keypoints, visImage, cv::Scalar::all(-1), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
+        string windowName = detectorType + " Keypoint Detector Results";
+        cv::namedWindow(windowName, 6);
+        imshow(windowName, visImage);
+        cv::waitKey(0);
+    }
+}
+// MP.2 End Keypoint Detection
