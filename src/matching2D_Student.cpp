@@ -3,7 +3,6 @@
 
 using namespace std;
 
-
 // Find best matches for keypoints in two camera images based on several matching methods
 void matchDescriptors(std::vector<cv::KeyPoint> &kPtsSource, std::vector<cv::KeyPoint> &kPtsRef, cv::Mat &descSource, cv::Mat &descRef,
                       std::vector<cv::DMatch> &matches, std::string descriptorType, std::string matcherType, std::string selectorType)
@@ -11,6 +10,8 @@ void matchDescriptors(std::vector<cv::KeyPoint> &kPtsSource, std::vector<cv::Key
     // configure matcher
     bool crossCheck = false;
     cv::Ptr<cv::DescriptorMatcher> matcher;
+    cout << "matcherType " << matcherType << endl;
+    cout << "descriptorType " << descriptorType << endl;
 
     /*
     if (matcherType.compare("MAT_BF") == 0)
@@ -43,18 +44,18 @@ void matchDescriptors(std::vector<cv::KeyPoint> &kPtsSource, std::vector<cv::Key
 
         matcher = cv::FlannBasedMatcher::create();
     }
-    // ...add end: MP.5 Descriptor Matching
+    // MP.5: End of descriptor Matching
 
-    // perform matching task
+    // perform matching task with nearest neighbor (best match)
     if (selectorType.compare("SEL_NN") == 0)
-    { // nearest neighbor (best match)
-
-        matcher->match(descSource, descRef, matches); // Finds the best match for each descriptor in desc1
+    {
+        // Finds the best match for each descriptor in desc1
+        matcher->match(descSource, descRef, matches);
     }
+    // k nearest neighbors (k=2)
     else if (selectorType.compare("SEL_KNN") == 0)
-    { // k nearest neighbors (k=2)
-
-        // ...add start: MP.6 Descriptor Distance Ratio
+    {
+        // .MP.6 Descriptor Distance Ratio start
         vector<vector<cv::DMatch>> knn_matches;
         matcher->knnMatch(descSource, descRef, knn_matches, 2);
 
@@ -63,10 +64,15 @@ void matchDescriptors(std::vector<cv::KeyPoint> &kPtsSource, std::vector<cv::Key
         {
             if( ((*it)[0].distance) < ((*it)[1].distance * minDescDistRatio) )
             {
+                cout << "# matched.size() " << matches.size() << endl;
                 matches.push_back((*it)[0]);
             }
         }
+
+        cout << "# knn_matches.size() " << knn_matches.size() << endl;
+
         cout << "# keypoints removed = " << knn_matches.size() - matches.size() << endl;
+
         // ...add end: MP.6 Descriptor Distance Ratio
     }
 }
