@@ -276,11 +276,6 @@ void detKeypointsShiTomasi(vector<cv::KeyPoint> &keypoints, cv::Mat &img, bool b
   t = ((double)cv::getTickCount() - t) / cv::getTickFrequency();
   cout << "Shi-Tomasi detection with n=" << keypoints.size() << " keypoints in " << 1000 * t / 1.0 << " ms" << endl;
 
-  fstream ofs;
-  ofs.open("SHITOMASI_detector_timings.txt", std::ios::app);
-  ofs << 1000 * t / 1.0 << '\n';
-  ofs.close();
-
   // visualize results
   if (bVis)
   {

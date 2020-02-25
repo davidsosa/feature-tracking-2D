@@ -6,6 +6,7 @@
 #include <vector>
 #include <cmath>
 #include <limits>
+
 #include <opencv2/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -19,92 +20,72 @@
 using namespace std;
 
 /* MAIN PROGRAM */
-int main(int argc, const char *argv[])
+int main(int argc, char *argv[])
 {
-
-    /* INIT VARIABLES AND DATA STRUCTURES */
-
     // data location
     string dataPath = "../";
-
-    // camera
     string imgBasePath = dataPath + "images/";
     string imgPrefix = "KITTI/2011_09_26/image_00/data/000000"; // left camera, color
     string imgFileType = ".png";
-    int imgStartIndex = 0; // first file index to load (assumes Lidar and camera names have identical naming convention)
+    
+    int imgStartIndex = 0; // first file index to load 
     int imgEndIndex = 9;   // last file index to load
     int imgFillWidth = 4;  // no. of digits which make up the file index (e.g. img-0001.png)
 
-    // misc
+    // MP.1 Data Buffer Optimization: Start
+    // bufferSize: no. of images which in ring buffer at the same time
+    int bufferSize = 3; 
+    vector<DataFrame> buffer; // list of data frames which are held in memory at the same time
+    bool bVis = false;  // visualize results
 
-    // ...modified start: MP.1 Data Buffer Optimization
-    // dataBufferSize: no. of images which are held in memory (ring buffer) at the same time
-    int dataBufferSize = 3; // default, original code: int dataBufferSize = 2;
-    // ...modified end: MP.1 Data Buffer Optimization
-
-    vector<DataFrame> dataBuffer; // list of data frames which are held in memory at the same time
-    bool bVis = false;            // visualize results
-
-    /* MAIN LOOP OVER ALL IMAGES */
-
-    //.. add start: MP.7, MP.8, and MP.9
-    vector<string> detector_type_names = {"SHITOMASI", "HARRIS", "FAST", "BRISK", "ORB", "AKAZE", "SIFT"};
-    vector<string> descriptor_type_names = {"BRISK", "BRIEF", "ORB", "FREAK", "AKAZE", "SIFT"};
+    // Create strings to loop over all algorithms
+    vector<string> detector_names = {"AKAZE", "BRISK", "FAST", "HARRIS", "FAST", "ORB", "SHITOMASI", "SIFT"};
+    vector<string> descriptor_names = {"BRISK", "BRIEF", "ORB", "FREAK", "AKAZE", "SIFT"};
 
     ofstream detector_file;
-    detector_file.open ("../MP_7_Counts_Keypoints.csv");
+    detector_file.open ("../MP7_keypoints_count.csv");
 
     ofstream det_des_matches;
-    det_des_matches.open ("../MP_8_Counts_Matched_Keypoints.csv");
+    det_des_matches.open ("../MP8_matched_points_count.csv");
 
     ofstream det_des_time;
-    det_des_time.open ("../MP_9_Log_Time.csv");
+    det_des_time.open ("../MP9_log_time.csv");
 
-    for(auto detector_type_name:detector_type_names) // start loop detector_types
+    for(auto detector_name:detector_names) // start loop detector_types
     {
         bool write_detector = false;
 
-        for(auto descriptor_type_name:descriptor_type_names) // start loop descriptor_types
+        for(auto descriptor_name:descriptor_names) // start loop descriptor_types
         {
-            if(detector_type_name.compare("AKAZE")!=0 && descriptor_type_name.compare("AKAZE")==0)
+            if(detector_name.compare("AKAZE")!=0 && descriptor_name.compare("AKAZE")==0)
                 continue;
 
-            if(detector_type_name.compare("AKAZE")==0 && descriptor_type_name.compare("AKAZE")==0)
+            if(detector_name.compare("AKAZE")==0 && descriptor_name.compare("AKAZE")==0)
                 continue;
 
-            dataBuffer.clear();
-
-            cout << "===================================================================" << endl;
-            cout << "Detector Type: " << detector_type_name << "   Descriptor Type: " << descriptor_type_name << endl;
-            cout << "===================================================================" << endl;
-
-            //.. add start: MP.7 Performance Evaluation 1
+            buffer.clear();
+ 
+            cout << "Detector: " << detector_name << "   Descriptor: " << descriptor_name << endl;
+            // MP.7 Performance wvaluation: Start
             // Write to detector keypoints number file
             if(!write_detector)
             {
-                detector_file << detector_type_name;
+                detector_file << detector_name;
             }
-            //.. add end: MP.7 Performance Evaluation 1
+            // MP.7 Performance Evaluation: End
 
-            //.. add start: MP.8 Performance Evaluation 2
-            det_des_matches << detector_type_name << "_" << descriptor_type_name;
-            //.. add end: MP.8 Performance Evaluation 2
-
-            //.. add start: MP.9 Performance Evaluation 3
-            det_des_time << detector_type_name << "_" << descriptor_type_name;
-            //.. add end: MP.9 Performance Evaluation 3
-
-            //.. add end: MP.7, MP.8, and MP.9
-
+            det_des_matches << detector_name << "_" << descriptor_name;
+            det_des_time << detector_name << "_" << descriptor_name;
+            
             for (size_t imgIndex = 0; imgIndex <= imgEndIndex - imgStartIndex; imgIndex++)
             {
-                //.. add start: MP.9 Performance Evaluation 3
+                //: MP.9 Performance Evaluation 3
                 double t = (double)cv::getTickCount();
-                //.. add end: MP.9 Performance Evaluation 3
+                // MP.9 Performance Evaluation 3
 
                 /* LOAD IMAGE INTO BUFFER */
 
-                // assemble filenames for current index
+                // filenames for current index
                 ostringstream imgNumber;
                 imgNumber << setfill('0') << setw(imgFillWidth) << imgStartIndex + imgIndex;
                 string imgFullFilename = imgBasePath + imgPrefix + imgNumber.str() + imgFileType;
@@ -115,21 +96,21 @@ int main(int argc, const char *argv[])
                 cv::cvtColor(img, imgGray, cv::COLOR_BGR2GRAY);
 
                 //// STUDENT ASSIGNMENT
-                //// TASK MP.1 -> replace the following code with ring buffer of size dataBufferSize
+                //// TASK MP.1 -> replace the following code with ring buffer of size bufferSize
 
                 // push image into data frame buffer
                 DataFrame frame;
                 frame.cameraImg = imgGray;
 
-                // ...add start: MP.1 Data Buffer Optimization
-                if (  dataBuffer.size()+1 > dataBufferSize)
+                // : MP.1 Data Buffer Optimization
+                if (  buffer.size()+1 > bufferSize)
                 {
-                    dataBuffer.erase(dataBuffer.begin());
+                    buffer.erase(buffer.begin());
                     cout << "REPLACE IMAGE IN BUFFER done" << endl;
                 }
-                // ...add end: MP.1 Data Buffer Optimization
+                // : MP.1 Data Buffer Optimization
 
-                dataBuffer.push_back(frame);
+                buffer.push_back(frame);
 
                 //// EOF STUDENT ASSIGNMENT
                 cout << "#1 : LOAD IMAGE INTO BUFFER done" << endl;
@@ -140,7 +121,8 @@ int main(int argc, const char *argv[])
                 vector<cv::KeyPoint> keypoints; // create empty feature list for current image
 
                 // ...modified start: MP.7, MP.8, MP.9
-                string detectorType = detector_type_name; //"SHITOMASI", "HARRIS", "FAST", "BRISK", "ORB", "AKAZE", "SIFT"
+                 //"SHITOMASI", "HARRIS", "FAST", "BRISK", "ORB", "AKAZE", "SIFT"
+                string detectorType = detector_name;
                 // ...modified end: MP.7, MP.8, MP.9
 
                 //// STUDENT ASSIGNMENT
@@ -151,7 +133,7 @@ int main(int argc, const char *argv[])
                 {
                     detKeypointsShiTomasi(keypoints, imgGray, false);
                 }
-                // ...add start: MP.2 Keypoint Detection
+                // : MP.2 Keypoint Detection
                 // detectorType = HARRIS
                 else if (detectorType.compare("HARRIS") == 0)
                 {
@@ -168,9 +150,10 @@ int main(int argc, const char *argv[])
                 }
                 else
                 {
-                    throw invalid_argument(detectorType + " is not a valid detectorType. Try SHITOMASI, HARRIS, FAST, BRISK, ORB, AKAZE, SIFT.");
+                    throw invalid_argument(detectorType + "Not a valid detectorType. Try SHITOMASI, HARRIS, FAST, BRISK, ORB, AKAZE or  SIFT.");
                 }
-                // ...add end: MP.2 Keypoint Detection
+                // MP.2 Keypoint Detection: End
+
                 //// EOF STUDENT ASSIGNMENT
 
                 //// STUDENT ASSIGNMENT
@@ -180,14 +163,14 @@ int main(int argc, const char *argv[])
                 bool bFocusOnVehicle = true;
                 cv::Rect vehicleRect(535, 180, 180, 150);
 
-                // ...add start: MP.3 Keypoint Removal
+                // MP.3 Keypoint Removal: Start
                 vector<cv::KeyPoint>::iterator keypoint;
                 vector<cv::KeyPoint> keypoints_roi;
-                // ...add end: MP.3 Keypoint Removal
+                // MP.3 Keypoint Removal: End
 
                 if (bFocusOnVehicle)
                 {
-                    // ...add start: MP.3 Keypoint Removal
+                    // : MP.3 Keypoint Removal
                     for(keypoint = keypoints.begin(); keypoint != keypoints.end(); ++keypoint)
                     {
                         if (vehicleRect.contains(keypoint->pt))
@@ -201,15 +184,15 @@ int main(int argc, const char *argv[])
 
                     keypoints =  keypoints_roi;
                     cout << "IN ROI n= " << keypoints.size()<<" keypoints"<<endl;
-                    // ...add end: MP.3 Keypoint Removal
+                    // MP.3 Keypoint Removal
                 }
 
-                //.. add start: MP.7 Performance Evaluation 1
+                //: MP.7 Performance Evaluation 1
                 if(!write_detector)
                 {
                     detector_file  << ", " << keypoints.size();
                 }
-                //.. add end: MP.7 Performance Evaluation 1
+                // MP.7 Performance Evaluation 1
 
                 //// EOF STUDENT ASSIGNMENT
 
@@ -228,7 +211,7 @@ int main(int argc, const char *argv[])
                 }
 
                 // push keypoints and descriptor for current frame to end of data buffer
-                (dataBuffer.end() - 1)->keypoints = keypoints;
+                (buffer.end() - 1)->keypoints = keypoints;
                 cout << "#2 : DETECT KEYPOINTS done" << endl;
 
                 /* EXTRACT KEYPOINT DESCRIPTORS */
@@ -240,19 +223,19 @@ int main(int argc, const char *argv[])
                 cv::Mat descriptors;
 
                 // ...modified start: MP.7, MP.8, MP.9
-                string descriptorType = descriptor_type_name; // BRIEF, ORB, FREAK, AKAZE, SIFT
+                string descriptorType = descriptor_name; // BRIEF, ORB, FREAK, AKAZE, SIFT
                 // ...modified end: MP.7, MP.8, MP.9
 
-                descKeypoints((dataBuffer.end() - 1)->keypoints, (dataBuffer.end() - 1)->cameraImg, descriptors, descriptorType);
+                descKeypoints((buffer.end() - 1)->keypoints, (buffer.end() - 1)->cameraImg, descriptors, descriptorType);
 
                 //// EOF STUDENT ASSIGNMENT
 
                 // push descriptors for current frame to end of data buffer
-                (dataBuffer.end() - 1)->descriptors = descriptors;
+                (buffer.end() - 1)->descriptors = descriptors;
 
                 cout << "#3 : EXTRACT DESCRIPTORS done" << endl;
 
-                if (dataBuffer.size() > 1) // wait until at least two images have been processed
+                if (buffer.size() > 1) // wait until at least two images have been processed
                 {
                     /* MATCH KEYPOINT DESCRIPTORS */
 
@@ -260,7 +243,7 @@ int main(int argc, const char *argv[])
                     string matcherType = "MAT_BF";        // MAT_BF, MAT_FLANN
                     //string descriptorType = "DES_BINARY"; // DES_BINARY, DES_HOG
 
-                    //.. add start: MP.4 Keypoint Descriptors
+                    //: MP.4 Keypoint Descriptors
                     string descriptorType;
                     if (descriptorType.compare("SIFT") == 0)
                     {
@@ -270,7 +253,7 @@ int main(int argc, const char *argv[])
                     {
                         descriptorType == "DES_BINARY";
                     }
-                    //.. add end: MP.4 Keypoint Descriptors
+                    // MP.4 Keypoint Descriptors
 
                     //.. modified start: MP.6 Descriptor Distance Ratio
                     string selectorType = "SEL_KNN";       // SEL_NN, SEL_KNN
@@ -280,23 +263,23 @@ int main(int argc, const char *argv[])
                     //// TASK MP.5 -> add FLANN matching in file matching2D.cpp
                     //// TASK MP.6 -> add KNN match selection and perform descriptor distance ratio filtering with t=0.8 in file matching2D.cpp
 
-                    matchDescriptors((dataBuffer.end() - 2)->keypoints, (dataBuffer.end() - 1)->keypoints,
-                                    (dataBuffer.end() - 2)->descriptors, (dataBuffer.end() - 1)->descriptors,
+                    matchDescriptors((buffer.end() - 2)->keypoints, (buffer.end() - 1)->keypoints,
+                                    (buffer.end() - 2)->descriptors, (buffer.end() - 1)->descriptors,
                                     matches, descriptorType, matcherType, selectorType);
 
                     //// EOF STUDENT ASSIGNMENT
 
                     // store matches in current data frame
-                    (dataBuffer.end() - 1)->kptMatches = matches;
+                    (buffer.end() - 1)->kptMatches = matches;
 
-                    //.. add start: MP.8 Performance Evaluation 2
+                    //: MP.8 Performance Evaluation 2
                     det_des_matches << ", " << matches.size();
-                    //.. add end: MP.8 Performance Evaluation 2
+                    // MP.8 Performance Evaluation 2
 
-                    //.. add start: MP.9 Performance Evaluation 3
+                    //: MP.9 Performance Evaluation 3
                     t = ((double)cv::getTickCount() - t) / cv::getTickFrequency();
                     det_des_time << ", " << 1000*t;
-                    //.. add end: MP.9 Performance Evaluation 3
+                    // MP.9 Performance Evaluation 3
 
                     cout << "#4 : MATCH KEYPOINT DESCRIPTORS done" << endl;
 
@@ -304,9 +287,9 @@ int main(int argc, const char *argv[])
                     bVis = false;
                     if (bVis)
                     {
-                        cv::Mat matchImg = ((dataBuffer.end() - 1)->cameraImg).clone();
-                        cv::drawMatches((dataBuffer.end() - 2)->cameraImg, (dataBuffer.end() - 2)->keypoints,
-                                        (dataBuffer.end() - 1)->cameraImg, (dataBuffer.end() - 1)->keypoints,
+                        cv::Mat matchImg = ((buffer.end() - 1)->cameraImg).clone();
+                        cv::drawMatches((buffer.end() - 2)->cameraImg, (buffer.end() - 2)->keypoints,
+                                        (buffer.end() - 1)->cameraImg, (buffer.end() - 1)->keypoints,
                                         matches, matchImg,
                                         cv::Scalar::all(-1), cv::Scalar::all(-1),
                                         vector<char>(), cv::DrawMatchesFlags::DRAW_RICH_KEYPOINTS);
@@ -322,7 +305,7 @@ int main(int argc, const char *argv[])
 
             } // eof loop over all images
 
-            //.. add start: MP.7, MP.8, and MP.9
+            //: MP.7, MP.8, and MP.9
             if(!write_detector)
             {
                 detector_file << endl;
@@ -338,7 +321,7 @@ int main(int argc, const char *argv[])
     detector_file.close();
     det_des_matches.close();
     det_des_time.close();
-    //.. add end: MP.7, MP.8, and MP.9
+    // MP.7, MP.8, and MP.9
 
     return 0;
 }
